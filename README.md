@@ -1,149 +1,390 @@
+<div align="center">
+
+<img src="docs/brand/logo-app-icon.svg" alt="Logo Quorum" width="96" />
+
 # Quorum
 
-Ứng dụng web gợi ý cổ phiếu Việt Nam. Mỗi tối sau phiên, mô hình học sâu **MIDMoE** chấm điểm 78 mã; 10 bản mô hình
-cùng "bỏ phiếu", và mã được nhiều mô hình xếp vào top 5 sẽ nổi lên. Người dùng xem bảng giá, gợi ý cho phiên tới, lý do
-xếp hạng, lọc cổ phiếu, theo dõi mã và hỏi trợ lý AI (Gemini) bằng tiếng Việt.
+**Gợi ý cổ phiếu Việt Nam cho phiên kế tiếp bằng mô hình học sâu MIDMoE, kèm lý do xếp hạng và trợ lý AI trả lời từ chính dữ liệu của mô hình.**
 
-> Đồ án chuyên ngành 2, ngành Trí tuệ nhân tạo, VKU. Điểm AI là công cụ tham khảo, không phải khuyến nghị đầu tư.
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-CPU-EE4C2C?logo=pytorch&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
+![Gemini](https://img.shields.io/badge/Gemini-function%20calling-4285F4?logo=googlegemini&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)
 
-## Thành phần
+[Giới thiệu](#giới-thiệu) ·
+[Demo](#demo) ·
+[Kiến trúc](#kiến-trúc) ·
+[Bắt đầu nhanh](#bắt-đầu-nhanh) ·
+[Cấu hình](#cấu-hình) ·
+[Trang và API chính](#trang-và-api-chính) ·
+[Tài liệu](#tài-liệu) ·
+[Lộ trình](#lộ-trình)
 
-| Thư mục | Nội dung |
+</div>
+
+---
+
+## Giới thiệu
+
+Nhà đầu tư cá nhân thường phải tự đọc bảng giá, chỉ báo kỹ thuật và tin tức của hàng chục mã mỗi ngày. Các công cụ
+"gợi ý mã" có sẵn hầu như không nói rõ vì sao một mã được chọn.
+
+Quorum là một ứng dụng web chạy thực tế trên dữ liệu thị trường Việt Nam. Mỗi chiều sau phiên giao dịch, hệ thống tự
+lấy giá và tin tức, chạy mô hình **MIDMoE** (Mixture of Experts kết hợp dữ liệu thị trường, chuỗi giá, tin tức và quan
+hệ ngành) để xếp hạng **78 cổ phiếu** cho phiên kế tiếp. Mô hình được huấn luyện với **10 seed**, và mỗi seed giống
+một thành viên hội đồng bỏ một phiếu: mã được nhiều mô hình cùng xếp vào top 5 là mã có độ đồng thuận cao. Tên
+Quorum lấy từ ý đó.
+
+Ứng dụng gồm hai phần:
+
+1. **Sản phẩm cho người dùng:** bảng giá, bản đồ nhiệt, gợi ý theo ngày, trang chi tiết mã với biểu đồ và chỉ báo, bộ
+   lọc, danh sách theo dõi và trang đo hiệu quả gợi ý một cách minh bạch.
+2. **Trợ lý AI:** Gemini được nối với cơ sở dữ liệu qua function calling. Nó trả lời bằng tiếng Việt từ kết quả thật của
+   mô hình, không trả lời theo trí nhớ của mô hình ngôn ngữ.
+
+> Điểm AI là công cụ tham khảo, không phải khuyến nghị đầu tư.
+
+### Ai dùng và dùng để làm gì
+
+| Người dùng | Dùng Quorum để |
 | --- | --- |
-| `backend/app/ml/` | Kiến trúc MarketMoE (chép nguyên từ notebook Kaggle), 7 chỉ báo, dựng cube, PhoBERT, ensemble 10 seed, giải thích |
-| `backend/app/sources/` | Giá ngày từ KBS (nguồn notebook đã dùng qua vnstock), tin tức từ trang tìm kiếm CafeF |
-| `backend/app/pipeline/` | Job 16:30 hằng ngày, chạy bù (backfill), nạp lịch sử kiểm định 2025, dữ liệu giả lập |
-| `backend/app/services/`, `api.py` | REST API: bảng giá, tổng quan, gợi ý, chi tiết mã, bộ lọc, hiệu quả, tài khoản, theo dõi |
-| `backend/app/assistant/`, `chat.py` | Trợ lý Gemini gọi công cụ tra cứu dữ liệu (function calling), trả lời dạng stream |
-| `frontend/` | Next.js 15 + TypeScript + Tailwind: 9 trang, sidebar trợ lý, biểu đồ lightweight-charts |
-| `artifacts/vn/` | Trọng số và tham số chuẩn hoá xuất từ Kaggle (không commit, xem `artifacts/README.md`) |
+| Khách chưa đăng nhập | Xem bảng giá, gợi ý phiên tới, chi tiết mã, bộ lọc, hiệu quả gợi ý và hỏi trợ lý |
+| Thành viên đã đăng nhập | Thêm vào đó: lưu danh sách theo dõi, trợ lý trả lời theo danh sách của mình |
+| Người vận hành | Chạy pipeline, nạp lịch sử, theo dõi log job và trạng thái dữ liệu qua `/api/health` |
 
+### Tính năng nổi bật
+
+**Thị trường**
+- Bảng giá 78 mã theo quy ước màu của sàn Việt Nam (trần tím, sàn xanh lam, tham chiếu vàng), kèm cột biên độ trong phiên
+  và biểu đồ mini 30 phiên.
+- Độ rộng thị trường, mã biến động mạnh nhất, dòng tiền theo ngành.
+- Bản đồ nhiệt: diện tích theo giá trị giao dịch, màu theo % thay đổi.
+
+**Gợi ý từ mô hình**
+- Xếp hạng đủ 78 mã cho phiên kế tiếp, số mô hình đồng thuận (0 đến 10), mức tăng giảm hạng so với hôm trước.
+- Xem lại gợi ý của các ngày trước cùng lợi nhuận thực tế của phiên sau đó.
+- Lý do xếp hạng: lần lượt bỏ từng nguồn thông tin (thị trường chung, diễn biến giá, tin tức, ngành) để xem hạng thay
+  đổi ra sao, kèm 7 chỉ báo kỹ thuật và tin CafeF được mô hình sử dụng.
+
+**Phân tích kỹ thuật**
+- Biểu đồ nến với menu chỉ báo: MA20, MA50, MA200, dải Bollinger, hồi quy tuyến tính (đường xu hướng, kênh ±2σ, độ dốc và
+  R²), RSI, MACD và hạng AI theo thời gian.
+- Bộ lọc theo ngành, hạng AI, độ đồng thuận, RSI, % thay đổi và thanh khoản.
+
+**Trợ lý AI**
+- Biết người dùng đang xem trang nào hoặc mã nào. Trả lời dạng stream và hiện bước đang tra cứu.
+- 11 công cụ đọc dữ liệu: gợi ý, chi tiết mã, lịch sử giá, lịch sử hạng, tin tức, so sánh, lọc, tổng quan thị trường,
+  hiệu quả gợi ý, thông tin mô hình, danh sách theo dõi.
+
+**Vận hành**
+- Lịch tự chạy: cập nhật giá 5 phút một lần trong phiên và chạy mô hình lúc 16:30 từ thứ 2 đến thứ 6.
+- Mỗi lần khởi động, hệ thống tự bù những phiên còn thiếu khi máy tắt.
+- Một lệnh Docker để chạy cả hệ thống.
+
+## Demo
+
+<div align="center">
+
+![Quorum demo](docs/media/quorum-demo.gif)
+
+</div>
+
+## Kiến trúc
+
+```mermaid
+flowchart LR
+    subgraph Nguon["Nguồn dữ liệu"]
+        KBS["KBS<br/>giá ngày 78 mã + VN-Index"]
+        CafeF["CafeF<br/>tin tức theo mã"]
+    end
+
+    subgraph Backend["Backend (FastAPI)"]
+        Sched["Lịch chạy<br/>APScheduler"]
+        Pipe["Pipeline<br/>chỉ báo · cube · PhoBERT"]
+        Model["MIDMoE<br/>10 seed, ensemble"]
+        DB[("SQLite / PostgreSQL")]
+        API["REST API"]
+        Agent["Trợ lý<br/>11 công cụ"]
+    end
+
+    Web["Next.js<br/>localhost:3000"]
+    Gemini["Gemini API"]
+    Art["artifacts/vn<br/>trọng số từ Kaggle"]
+
+    KBS --> Pipe
+    CafeF --> Pipe
+    Sched --> Pipe
+    Art --> Model
+    Pipe --> Model --> DB
+    DB --> API --> Web
+    Web -- "câu hỏi" --> Agent
+    Agent <--> Gemini
+    Agent --> DB
 ```
-KBS (giá) ─┐                                   ┌─► Next.js (localhost:3000)
-CafeF (tin)┼─► pipeline 16:30 ─► SQLite/Postgres ◄─ FastAPI (localhost:8000) ◄─┤
-artifacts ─┘   (10 seed + giải thích)                      │                    └─► Gemini API
-                                                           └── trợ lý: công cụ đọc cùng service layer
+
+### Trợ lý trả lời một câu hỏi như thế nào
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Người dùng
+    participant W as Web
+    participant A as API /chat
+    participant G as Gemini
+    participant D as Cơ sở dữ liệu
+
+    U->>W: "Vì sao VCB được xếp hạng như vậy?"
+    W->>A: câu hỏi + ngữ cảnh (đang xem VCB)
+    A->>G: system prompt + danh sách công cụ
+    G-->>A: gọi get_stock("VCB")
+    A->>D: hạng, phiếu, ablation, chỉ báo, tin
+    D-->>A: JSON
+    A->>G: kết quả công cụ
+    G-->>A: câu trả lời (stream)
+    A-->>W: từng đoạn văn bản
+    W-->>U: hiển thị dần + liên kết mã
 ```
 
-## Chạy nhanh bằng Docker
+### Một ngày của pipeline
 
-Cần Docker Desktop, file `.env` đã điền `GEMINI_API_KEY` và thư mục `artifacts/vn`. Tại thư mục `quorum`:
+```mermaid
+stateDiagram-v2
+    [*] --> TrongPhien: 9:00
+    TrongPhien --> TrongPhien: cập nhật giá 5 phút/lần
+    TrongPhien --> DongCua: 15:05
+    DongCua --> ChayMoHinh: 16:30
+    ChayMoHinh --> CoGoiY: lưu hạng, phiếu, giải thích
+    CoGoiY --> [*]: điền lợi nhuận thực tế của phiên trước
+```
+
+### Mô hình
+
+| Thành phần | Vai trò |
+| --- | --- |
+| Market cube (Conv3D) | Ảnh thị trường 16 phiên × 78 mã × 7 chỉ báo |
+| Time-series projection | Chuỗi chỉ báo của chính mã |
+| News projection | Vector PhoBERT (768 chiều) của tin gần nhất trong 5 ngày |
+| Sector graph (SGC) | Lan truyền thông tin giữa các mã cùng ngành ICB |
+| Diffusion condition (DIT) | Mã hoá điều kiện cho các expert |
+| 3 × 3 FourierMLP experts + SSAM | Chọn expert bằng sparsemax, ra điểm cho từng mã |
+| Ensemble 10 seed | Trung bình thứ hạng; số phiếu là số seed xếp mã vào top 5 |
+
+Bản đóng gói cho ra **đúng điểm số** của notebook Kaggle: test `test_parity_with_kaggle_reference` so khớp với
+`vn_parity_ref.npz`, sai số bằng 0. Một ngày dự đoán mất khoảng 0,15 giây trên CPU.
+
+### Bảo mật
+
+| Vấn đề | Cách xử lý |
+| --- | --- |
+| Mật khẩu | Băm bằng bcrypt, không lưu bản rõ |
+| Đăng nhập | JWT ký bằng `JWT_SECRET`, hết hạn sau 7 ngày |
+| Key Gemini | Chỉ nằm ở backend trong `.env`, trình duyệt không thấy |
+| Lạm dụng trợ lý | Giới hạn số câu hỏi mỗi giờ, giới hạn số vòng gọi công cụ |
+| Dữ liệu không đưa lên git | `.env`, `data/`, `artifacts/vn/` nằm trong `.gitignore` |
+
+## Bắt đầu nhanh
+
+### Yêu cầu
+
+- Docker Desktop (cách khuyên dùng), **hoặc** Python 3.11+ và Node.js 20+
+- Key Gemini lấy tại https://aistudio.google.com/apikey
+- Thư mục `artifacts/vn` xuất từ notebook Kaggle (xem [artifacts/README.md](artifacts/README.md))
+
+### Chạy bằng Docker
 
 ```powershell
+git clone https://github.com/<tai-khoan>/quorum.git
+cd quorum
+copy .env.example .env          # điền GEMINI_API_KEY
+# chép artifacts/vn vào đúng chỗ
 powershell -ExecutionPolicy Bypass -File scripts\first-run.ps1
 ```
 
-Script build 2 container, kiểm tra mô hình, nạp dữ liệu thật rồi báo mở http://localhost:3000. Hướng dẫn đầy đủ và cách
-xử lý lỗi: [docs/DOCKER.md](docs/DOCKER.md). Phần dưới đây là cách chạy không dùng Docker.
-
-## Cài đặt trên Windows (không dùng Docker)
-
-Cần **Python 3.11+**, **Node.js 20+** và **Git**. Mở PowerShell tại thư mục `quorum`.
-
-### 1. Backend
+Lần đầu mất khoảng 15 đến 40 phút (tải PyTorch, PhoBERT, giá và tin). Xong thì mở http://localhost:3000.
+Từ lần sau chỉ cần:
 
 ```powershell
+docker compose up -d
+```
+
+Hướng dẫn đầy đủ và cách xử lý lỗi: [docs/DOCKER.md](docs/DOCKER.md).
+
+### Chạy ở chế độ phát triển
+
+```powershell
+# Backend
 cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1          # Git Bash: source .venv/Scripts/activate
+python -m venv .venv; .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-cd ..
-copy .env.example .env                 # rồi mở .env, điền GEMINI_API_KEY
-```
-
-PyTorch bản mặc định trên Windows đã chạy được bằng CPU; mô hình rất nhẹ (khoảng 0,15 giây cho một ngày dự đoán).
-
-### 2. Artifacts của mô hình
-
-Chép thư mục `artifacts/vn` (từ file `midmoe_vn_artifacts.zip` của notebook `midmoe-vn-transfer-weights`) vào
-`quorum/artifacts/vn`. Kiểm tra mô hình chạy khớp Kaggle:
-
-```powershell
-cd backend
-python -m pytest
-```
-
-Test `test_parity_with_kaggle_reference` phải qua: nghĩa là bản đóng gói cho ra đúng điểm số như notebook.
-
-### 3. Nạp dữ liệu
-
-Chạy trong thư mục `backend` (đã kích hoạt `.venv`):
-
-```powershell
-python -m app.cli init                         # tạo cơ sở dữ liệu + 78 mã
-python -m app.cli seed-history                 # 243 phiên kiểm định 2025 từ test cube (~1 phút)
-python -m app.cli prices                       # giá 78 mã + VN-Index từ 01/2024 đến nay (~2 phút)
-python -m app.cli news --from 2026-10-01       # tin CafeF + nhúng PhoBERT (lần đầu tải ~540 MB model)
-python -m app.cli backfill --from 2026-01-02   # chạy mô hình cho từng phiên từ đầu năm 2026
-```
-
-Sau đó mỗi ngày chỉ cần `python -m app.cli daily`, hoặc để lịch tự chạy (bước 5).
-
-Không có mạng hoặc chỉ muốn xem giao diện: `python -m app.cli demo` nạp giá **giả lập** và chạy mô hình trên đó.
-Giao diện sẽ hiện nhãn "Giá giả lập". Đừng dùng lệnh này trên cơ sở dữ liệu dùng để demo thật; muốn làm lại từ đầu thì
-xoá file `data/quorum.db`.
-
-### 4. Chạy ứng dụng
-
-Terminal 1, backend:
-
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
+python -m app.cli init
+python -m app.cli seed-history
+python -m app.cli prices
+python -m app.cli backfill --from 2026-01-02
 uvicorn app.main:app --reload --port 8000
-```
 
-Terminal 2, frontend:
-
-```powershell
+# Frontend (terminal khác)
 cd frontend
 npm install
 copy .env.local.example .env.local
 npm run dev
 ```
 
-Mở http://localhost:3000. Tài liệu API tự sinh: http://localhost:8000/docs.
+Không có mạng thì chạy `python -m app.cli demo` để có dữ liệu giả lập. Giao diện sẽ hiện nhãn "Giá giả lập".
 
-### 5. Lịch chạy hằng ngày
+### Lệnh thường dùng
 
-Chọn một trong hai cách:
-
-* Đặt `RUN_SCHEDULER=true` trong `.env`: mỗi lần khởi động API tự bù dữ liệu và dự báo cho các phiên còn thiếu, sau đó chạy job 16:30 (thứ 2 đến thứ 6) và cập nhật giá 5 phút một lần trong phiên. Bản Docker đã bật sẵn.
-* Hoặc mở terminal riêng: `python -m app.cli scheduler`.
-
-## Các trang
-
-| Đường dẫn | Nội dung |
+| Lệnh | Việc |
 | --- | --- |
-| `/` | Gợi ý cho phiên tới, VN-Index, độ rộng, bản đồ thị trường, mã tăng/giảm, tăng hạng mạnh |
-| `/bang-gia` | Bảng giá 78 mã theo ngành, màu theo quy ước trần/sàn/tham chiếu, cột hạng AI |
-| `/goi-y` | Xếp hạng đủ 78 mã, xem lại các ngày trước cùng kết quả thực tế phiên sau |
-| `/co-phieu/[mã]` | Biểu đồ nến + hạng AI, lý do xếp hạng, 7 chỉ báo, tin tức, cùng ngành, lịch sử gợi ý |
-| `/bo-loc` | Lọc theo ngành, hạng AI, số mô hình đồng thuận, RSI, % thay đổi, thanh khoản |
+| `docker compose up -d` / `down` | Bật / tắt cả hệ thống |
+| `docker compose up -d --build` | Build lại sau khi sửa code |
+| `docker compose logs -f api` | Xem log backend |
+| `python -m app.cli catch-up` | Bù giá, tin và dự báo cho mọi phiên còn thiếu |
+| `python -m app.cli daily` | Chạy job 16:30 ngay |
+| `python -m app.cli backfill --from 2026-11-01` | Chạy lại mô hình cho một khoảng ngày |
+| `python -m app.cli news --from 2026-11-01` | Tải thêm tin và nhúng PhoBERT |
+| `python -m app.cli demo` | Nạp dữ liệu giả lập để xem giao diện |
+
+Với Docker, thêm `docker compose exec api` trước các lệnh `python -m app.cli`.
+
+## Cấu hình
+
+Các biến trong file `.env` ở thư mục gốc:
+
+| Biến | Ý nghĩa | Mặc định |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | Key cho trợ lý AI | (trống, trợ lý tắt) |
+| `GEMINI_MODEL` | Tên model Gemini | `gemini-3.5-flash` |
+| `DATABASE_URL` | Chuỗi kết nối cơ sở dữ liệu | SQLite tại `data/quorum.db` |
+| `ARTIFACT_DIR` | Thư mục trọng số mô hình | `artifacts/vn` |
+| `JWT_SECRET` | Chuỗi bí mật ký token đăng nhập | cần đổi trước khi dùng |
+| `CORS_ORIGINS` | Địa chỉ frontend được gọi API | `http://localhost:3000` |
+| `RUN_SCHEDULER` | Chạy lịch tự động trong tiến trình API | `false` (Docker: `true`) |
+| `PRICE_HISTORY_START` | Ngày bắt đầu tải lịch sử giá | `2024-01-01` |
+| `NEWS_ENABLED` | Lấy tin CafeF và nhúng PhoBERT | `true` |
+| `CHAT_RATE_LIMIT_PER_HOUR` | Số câu hỏi tối đa mỗi giờ | `60` |
+
+Muốn dùng PostgreSQL:
+
+```env
+DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/quorum
+```
+
+## Trang và API chính
+
+| Trang | Nội dung |
+| --- | --- |
+| `/` | Tổng quan: gợi ý phiên tới, VN-Index, độ rộng, bản đồ thị trường |
+| `/bang-gia` | Bảng giá, biên độ ngày, biểu đồ 30 phiên, bản đồ nhiệt |
+| `/goi-y` | Xếp hạng 78 mã, xem lại các ngày trước và kết quả thực tế |
+| `/co-phieu/[mã]` | Biểu đồ nến và chỉ báo, lý do xếp hạng, tin tức, cùng ngành |
+| `/bo-loc` | Lọc cổ phiếu theo nhiều tiêu chí |
 | `/theo-doi` | Danh sách theo dõi (cần đăng nhập) |
-| `/hieu-qua` | Lợi nhuận cộng dồn top-K so với cả rổ và VN-Index, nhật ký từng phiên |
+| `/hieu-qua` | Lợi nhuận cộng dồn top-K so với cả rổ và VN-Index |
 | `/gioi-thieu` | Cách Quorum hoạt động và hạn chế |
+| `/dang-nhap`, `/dang-ky` | Tài khoản |
 
-## Ghi chú về mô hình và dữ liệu
+| Nhóm API | Endpoint |
+| --- | --- |
+| Hệ thống | `GET /api/health`, `GET /api/tickers`, `GET /api/search` |
+| Thị trường | `GET /api/market/overview`, `GET /api/market/board` |
+| Gợi ý | `GET /api/ai/dates`, `/ai/picks`, `/ai/rankings`, `/ai/track-record` |
+| Cổ phiếu | `GET /api/stocks/{mã}`, `/prices`, `/rank-history`, `/explanation`, `/news`, `/peers` |
+| Bộ lọc | `GET /api/screener` |
+| Tài khoản | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` |
+| Theo dõi | `GET /api/watchlist`, `PUT` / `DELETE /api/watchlist/{mã}` |
+| Trợ lý | `POST /api/chat` (Server-Sent Events) |
 
-* **Tiền xử lý khớp lúc train.** Giá chia 1000 (nghìn đồng) như vnstock; RSI/MACD viết lại theo đúng quy ước
-  pandas-ta 0.4.x (notebook in ra 1 giá trị thiếu cho RSI, 25 cho MACD, test kiểm tra điều này); chuẩn hoá bằng đúng
-  `vn_norm_params.json`; mỗi mã lấy một tin CafeF mới nhất trong 5 ngày, nhúng bằng `vinai/phobert-base`, trung bình mọi
-  token với độ dài 64.
-* **Ensemble.** Thứ hạng cuối là trung bình thứ hạng của 10 seed; "đồng thuận" là số seed xếp mã vào top 5.
-* **Hiệu quả thật.** Trên dữ liệu kiểm định 2025, từng seed riêng lẻ đạt Sharpe theo phiên trung bình 0,041 như trong
-  bài báo, nhưng bản gộp 10 seed chỉ khoảng 0,03 và chưa vượt chọn ngẫu nhiên một cách có ý nghĩa thống kê. Trang
-  `/hieu-qua` hiển thị đúng số liệu này.
-* **vnstock và pandas-ta** đều không còn trên PyPI, nên dự án gọi thẳng endpoint KBS và tự cài đặt RSI/MACD.
+Tài liệu API tự sinh: http://localhost:8000/docs
+
+## Công nghệ
+
+| Phần | Công nghệ |
+| --- | --- |
+| Mô hình | PyTorch (CPU), Transformers với `vinai/phobert-base` |
+| Backend | FastAPI, SQLAlchemy 2, Pydantic Settings, APScheduler, bcrypt, PyJWT |
+| Dữ liệu | KBS (giá ngày), CafeF (tin tức), pandas, BeautifulSoup |
+| Trợ lý | Google Gemini qua `google-genai`, function calling, SSE |
+| Lưu trữ | SQLite (WAL), có thể đổi sang PostgreSQL |
+| Giao diện | Next.js 15, React 19, TypeScript, Tailwind CSS, SWR |
+| Biểu đồ | lightweight-charts 5, d3-hierarchy |
+| Đóng gói | Docker, docker compose, Next.js standalone |
+
+## Tài liệu
+
+| Tài liệu | Nội dung |
+| --- | --- |
+| [docs/DOCKER.md](docs/DOCKER.md) | Cài và chạy bằng Docker, xử lý lỗi |
+| [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) | Quy trình issue, nhánh, commit, pull request |
+| [artifacts/README.md](artifacts/README.md) | Cách lấy trọng số mô hình từ Kaggle |
+| [docs/brand/](docs/brand/) | Logo dạng SVG |
+
+## Cấu trúc thư mục
+
+```text
+quorum/
+├── backend/
+│   ├── app/
+│   │   ├── ml/          # MarketMoE, chỉ báo, cube, PhoBERT, ensemble, giải thích
+│   │   ├── sources/     # KBS, CafeF
+│   │   ├── pipeline/    # job hằng ngày, chạy bù, lịch, dữ liệu giả lập
+│   │   ├── services/    # nghiệp vụ cho API
+│   │   ├── assistant/   # công cụ, prompt, vòng gọi Gemini
+│   │   ├── api.py, chat.py, main.py, cli.py
+│   └── tests/
+├── frontend/
+│   └── src/
+│       ├── app/         # các trang
+│       ├── components/  # shell, biểu đồ, chat, ui
+│       └── lib/         # API client, định dạng số, chỉ báo
+├── artifacts/           # trọng số mô hình (không commit)
+├── docs/
+├── scripts/             # first-run.ps1, publish_history.py
+└── docker-compose.yml
+```
 
 ## Kiểm thử
 
 ```powershell
-cd backend; python -m pytest       # 18 test: chỉ báo, ensemble, parity với Kaggle, parser nguồn dữ liệu, API, trợ lý
-cd frontend; npm run build         # kiểm tra kiểu TypeScript và build production
+cd backend
+python -m pytest          # chỉ báo, ensemble, parity với Kaggle, parser nguồn dữ liệu, API, trợ lý
+
+cd ..\frontend
+npm run build             # kiểm tra kiểu TypeScript và build production
 ```
 
-## Quy trình git
+Trong Docker: `docker compose exec api python -m pytest`.
 
-Xem [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md): cách tạo repo, issue, nhánh, commit và pull request, cùng script
-`scripts/publish_history.py` đưa toàn bộ code lên GitHub theo từng tính năng.
+## Kết quả và hạn chế
+
+- Trên dữ liệu kiểm định năm 2025, từng seed đạt Sharpe theo phiên trung bình **0,041** như trong bài báo gốc. Bản gộp
+  10 seed đạt khoảng **0,03** và **chưa vượt chọn ngẫu nhiên** một cách có ý nghĩa thống kê. Trang `/hieu-qua` hiển thị
+  đúng số liệu này.
+- Chưa tính phí giao dịch, thuế, quy tắc T+2 và biên độ trần/sàn khi đo lợi nhuận.
+- Chỉ 78 mã thanh khoản tốt có điểm AI.
+- vnstock và pandas-ta không còn trên PyPI, nên dự án gọi thẳng endpoint KBS và tự viết lại RSI/MACD đúng quy ước lúc train.
+
+## Lộ trình
+
+- [x] Đóng gói mô hình MIDMoE, khớp điểm số với Kaggle
+- [x] Pipeline giá và tin tức tự chạy hằng ngày, tự bù phiên thiếu
+- [x] Bảng giá, bản đồ nhiệt, trang chi tiết mã với chỉ báo kỹ thuật
+- [x] Lý do xếp hạng bằng ablation từng nguồn thông tin
+- [x] Trợ lý Gemini với function calling
+- [x] Tài khoản và danh sách theo dõi
+- [x] Docker một lệnh
+- [ ] Cảnh báo khi mã trong danh sách theo dõi vào top 5
+- [ ] Tính phí giao dịch và T+2 khi đo hiệu quả
+- [ ] Mở rộng rổ mã và huấn luyện lại định kỳ
+- [ ] Giao diện tối ưu cho điện thoại
+
+## Đóng góp
+
+Mỗi thay đổi đi theo quy trình issue, nhánh `feat/...` hoặc `fix/...`, commit theo Conventional Commits và pull request
+có dòng `Closes #số-issue`. Chi tiết trong [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md).
+
+## Giấy phép
+
+Đồ án chuyên ngành, ngành Trí tuệ nhân tạo, Trường Đại học CNTT và Truyền thông Việt - Hàn (VKU). Mã nguồn dùng cho mục
+đích học tập. Dữ liệu giá thuộc KBS, tin tức thuộc CafeF.
