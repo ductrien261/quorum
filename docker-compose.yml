@@ -1,0 +1,37 @@
+# Quorum: docker compose up -d --build   (chi tiết: docs/DOCKER.md)
+name: quorum
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: quorum-api
+    env_file: .env
+    environment:
+      RUN_SCHEDULER: "true"          # job 16:30 và cập nhật giá trong phiên chạy ngay trong container
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./artifacts:/app/artifacts:ro   # trọng số mô hình (chép từ Kaggle)
+      - quorum-data:/app/data           # cơ sở dữ liệu SQLite
+      - hf-cache:/app/.hf               # model PhoBERT tải lần đầu (~540 MB)
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    image: quorum-web
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  quorum-data:
+  hf-cache:
