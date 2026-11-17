@@ -4,7 +4,7 @@
 
 # Quorum
 
-**Gợi ý cổ phiếu Việt Nam cho phiên kế tiếp bằng mô hình học sâu MIDMoE, kèm lý do xếp hạng và trợ lý AI trả lời từ chính dữ liệu của mô hình.**
+**Hệ thống khuyến nghị đầu tư chứng khoán thông minh dựa trên mô hình học sâu phân cấp và trợ lý ảo AI**
 
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
@@ -19,8 +19,7 @@
 [Bắt đầu nhanh](#bắt-đầu-nhanh) ·
 [Cấu hình](#cấu-hình) ·
 [Trang và API chính](#trang-và-api-chính) ·
-[Tài liệu](#tài-liệu) ·
-[Lộ trình](#lộ-trình)
+[Tài liệu](#tài-liệu)
 
 </div>
 
@@ -31,11 +30,8 @@
 Nhà đầu tư cá nhân thường phải tự đọc bảng giá, chỉ báo kỹ thuật và tin tức của hàng chục mã mỗi ngày. Các công cụ
 "gợi ý mã" có sẵn hầu như không nói rõ vì sao một mã được chọn.
 
-Quorum là một ứng dụng web chạy thực tế trên dữ liệu thị trường Việt Nam. Mỗi chiều sau phiên giao dịch, hệ thống tự
-lấy giá và tin tức, chạy mô hình **MIDMoE** (Mixture of Experts kết hợp dữ liệu thị trường, chuỗi giá, tin tức và quan
-hệ ngành) để xếp hạng **78 cổ phiếu** cho phiên kế tiếp. Mô hình được huấn luyện với **10 seed**, và mỗi seed giống
-một thành viên hội đồng bỏ một phiếu: mã được nhiều mô hình cùng xếp vào top 5 là mã có độ đồng thuận cao. Tên
-Quorum lấy từ ý đó.
+Quorum là một ứng dụng web chạy trên dữ liệu thị trường Việt Nam. Mỗi chiều sau phiên giao dịch, hệ thống tự lấy giá
+và tin tức, chạy mô hình học sâu để xếp hạng **78 cổ phiếu** cho phiên kế tiếp và giải thích vì sao mỗi mã có thứ hạng đó.
 
 Ứng dụng gồm hai phần:
 
@@ -63,7 +59,7 @@ Quorum lấy từ ý đó.
 - Bản đồ nhiệt: diện tích theo giá trị giao dịch, màu theo % thay đổi.
 
 **Gợi ý từ mô hình**
-- Xếp hạng đủ 78 mã cho phiên kế tiếp, số mô hình đồng thuận (0 đến 10), mức tăng giảm hạng so với hôm trước.
+- Xếp hạng đủ 78 mã cho phiên kế tiếp, độ đồng thuận giữa các mô hình, mức tăng giảm hạng so với hôm trước.
 - Xem lại gợi ý của các ngày trước cùng lợi nhuận thực tế của phiên sau đó.
 - Lý do xếp hạng: lần lượt bỏ từng nguồn thông tin (thị trường chung, diễn biến giá, tin tức, ngành) để xem hạng thay
   đổi ra sao, kèm 7 chỉ báo kỹ thuật và tin CafeF được mô hình sử dụng.
@@ -103,7 +99,7 @@ flowchart LR
     subgraph Backend["Backend (FastAPI)"]
         Sched["Lịch chạy<br/>APScheduler"]
         Pipe["Pipeline<br/>chỉ báo · cube · PhoBERT"]
-        Model["MIDMoE<br/>10 seed, ensemble"]
+        Model["Mô hình<br/>xếp hạng"]
         DB[("SQLite / PostgreSQL")]
         API["REST API"]
         Agent["Trợ lý<br/>11 công cụ"]
@@ -111,7 +107,7 @@ flowchart LR
 
     Web["Next.js<br/>localhost:3000"]
     Gemini["Gemini API"]
-    Art["artifacts/vn<br/>trọng số từ Kaggle"]
+    Art["artifacts/vn<br/>trọng số mô hình"]
 
     KBS --> Pipe
     CafeF --> Pipe
@@ -159,21 +155,6 @@ stateDiagram-v2
     CoGoiY --> [*]: điền lợi nhuận thực tế của phiên trước
 ```
 
-### Mô hình
-
-| Thành phần | Vai trò |
-| --- | --- |
-| Market cube (Conv3D) | Ảnh thị trường 16 phiên × 78 mã × 7 chỉ báo |
-| Time-series projection | Chuỗi chỉ báo của chính mã |
-| News projection | Vector PhoBERT (768 chiều) của tin gần nhất trong 5 ngày |
-| Sector graph (SGC) | Lan truyền thông tin giữa các mã cùng ngành ICB |
-| Diffusion condition (DIT) | Mã hoá điều kiện cho các expert |
-| 3 × 3 FourierMLP experts + SSAM | Chọn expert bằng sparsemax, ra điểm cho từng mã |
-| Ensemble 10 seed | Trung bình thứ hạng; số phiếu là số seed xếp mã vào top 5 |
-
-Bản đóng gói cho ra **đúng điểm số** của notebook Kaggle: test `test_parity_with_kaggle_reference` so khớp với
-`vn_parity_ref.npz`, sai số bằng 0. Một ngày dự đoán mất khoảng 0,15 giây trên CPU.
-
 ### Bảo mật
 
 | Vấn đề | Cách xử lý |
@@ -190,7 +171,7 @@ Bản đóng gói cho ra **đúng điểm số** của notebook Kaggle: test `te
 
 - Docker Desktop (cách khuyên dùng), **hoặc** Python 3.11+ và Node.js 20+
 - Key Gemini lấy tại https://aistudio.google.com/apikey
-- Thư mục `artifacts/vn` xuất từ notebook Kaggle (xem [artifacts/README.md](artifacts/README.md))
+- Thư mục `artifacts/vn` chứa trọng số mô hình (xem [artifacts/README.md](artifacts/README.md))
 
 ### Chạy bằng Docker
 
@@ -317,7 +298,7 @@ Tài liệu API tự sinh: http://localhost:8000/docs
 | --- | --- |
 | [docs/DOCKER.md](docs/DOCKER.md) | Cài và chạy bằng Docker, xử lý lỗi |
 | [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) | Quy trình issue, nhánh, commit, pull request |
-| [artifacts/README.md](artifacts/README.md) | Cách lấy trọng số mô hình từ Kaggle |
+| [artifacts/README.md](artifacts/README.md) | Cách đặt trọng số mô hình |
 | [docs/brand/](docs/brand/) | Logo dạng SVG |
 
 ## Cấu trúc thư mục
@@ -326,7 +307,7 @@ Tài liệu API tự sinh: http://localhost:8000/docs
 quorum/
 ├── backend/
 │   ├── app/
-│   │   ├── ml/          # MarketMoE, chỉ báo, cube, PhoBERT, ensemble, giải thích
+│   │   ├── ml/          # mô hình, chỉ báo, nhúng tin tức, giải thích
 │   │   ├── sources/     # KBS, CafeF
 │   │   ├── pipeline/    # job hằng ngày, chạy bù, lịch, dữ liệu giả lập
 │   │   ├── services/    # nghiệp vụ cho API
@@ -348,7 +329,7 @@ quorum/
 
 ```powershell
 cd backend
-python -m pytest          # chỉ báo, ensemble, parity với Kaggle, parser nguồn dữ liệu, API, trợ lý
+python -m pytest          # chỉ báo, mô hình, parser nguồn dữ liệu, API, trợ lý
 
 cd ..\frontend
 npm run build             # kiểm tra kiểu TypeScript và build production
@@ -356,35 +337,7 @@ npm run build             # kiểm tra kiểu TypeScript và build production
 
 Trong Docker: `docker compose exec api python -m pytest`.
 
-## Kết quả và hạn chế
-
-- Trên dữ liệu kiểm định năm 2025, từng seed đạt Sharpe theo phiên trung bình **0,041** như trong bài báo gốc. Bản gộp
-  10 seed đạt khoảng **0,03** và **chưa vượt chọn ngẫu nhiên** một cách có ý nghĩa thống kê. Trang `/hieu-qua` hiển thị
-  đúng số liệu này.
-- Chưa tính phí giao dịch, thuế, quy tắc T+2 và biên độ trần/sàn khi đo lợi nhuận.
-- Chỉ 78 mã thanh khoản tốt có điểm AI.
-- vnstock và pandas-ta không còn trên PyPI, nên dự án gọi thẳng endpoint KBS và tự viết lại RSI/MACD đúng quy ước lúc train.
-
-## Lộ trình
-
-- [x] Đóng gói mô hình MIDMoE, khớp điểm số với Kaggle
-- [x] Pipeline giá và tin tức tự chạy hằng ngày, tự bù phiên thiếu
-- [x] Bảng giá, bản đồ nhiệt, trang chi tiết mã với chỉ báo kỹ thuật
-- [x] Lý do xếp hạng bằng ablation từng nguồn thông tin
-- [x] Trợ lý Gemini với function calling
-- [x] Tài khoản và danh sách theo dõi
-- [x] Docker một lệnh
-- [ ] Cảnh báo khi mã trong danh sách theo dõi vào top 5
-- [ ] Tính phí giao dịch và T+2 khi đo hiệu quả
-- [ ] Mở rộng rổ mã và huấn luyện lại định kỳ
-- [ ] Giao diện tối ưu cho điện thoại
-
 ## Đóng góp
 
 Mỗi thay đổi đi theo quy trình issue, nhánh `feat/...` hoặc `fix/...`, commit theo Conventional Commits và pull request
 có dòng `Closes #số-issue`. Chi tiết trong [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md).
-
-## Giấy phép
-
-Đồ án chuyên ngành, ngành Trí tuệ nhân tạo, Trường Đại học CNTT và Truyền thông Việt - Hàn (VKU). Mã nguồn dùng cho mục
-đích học tập. Dữ liệu giá thuộc KBS, tin tức thuộc CafeF.
