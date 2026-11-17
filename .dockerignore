@@ -1,0 +1,12 @@
+# context of the API image is the repo root: send only backend/
+.git
+frontend
+artifacts
+data
+docs
+scripts
+.env
+**/__pycache__
+**/.pytest_cache
+**/.venv
+**/venv
